@@ -1,52 +1,88 @@
 from openai import OpenAI, OpenAIError
 import logging
 from config.settings import OPENAI_API_KEY, OPENAI_MODEL
+from services.prompts import TextCorrectionPrompts
+from config.constants import (
+    SECTION_CORRECTED,
+    SECTION_EXPLANATION,
+    ERROR_API_KEY_MISSING,
+    ERROR_OPENAI_API,
+    ERROR_SERVER,
+    ERROR_PARSING
+)
+from utils.response_wrapper import ResponseWrapper
 
 logger = logging.getLogger(__name__)
 
 class OpenAIService:
     def __init__(self):
         if not OPENAI_API_KEY:
-            raise ValueError("OPENAI_API_KEY not found in environment variables")
+            raise ValueError(ERROR_API_KEY_MISSING)
+            
         self.client = OpenAI(api_key=OPENAI_API_KEY)
         self.model = OPENAI_MODEL
 
-    def correct_text(self, text: str) -> dict:
-        prompt = (
-            "You are an English teacher. Fix the grammar and spelling of this text:\n\n"
-            f"{text}\n\n"
-            "Corrected version:"
-        )
+    def _parse_response(self, response_text: str) -> dict:
+        """Parse the response text into corrected text and explanation."""
+        try:
+            # Split the response into sections by looking for the section headers
+            corrected = ""
+            explanation = ""
+            
+            # Find the corrected section
+            if SECTION_CORRECTED in response_text:
+                corrected_start = response_text.find(SECTION_CORRECTED) + len(SECTION_CORRECTED)
+                if SECTION_EXPLANATION in response_text:
+                    corrected_end = response_text.find(SECTION_EXPLANATION)
+                    corrected = response_text[corrected_start:corrected_end].strip()
+                else:
+                    corrected = response_text[corrected_start:].strip()
+            
+            # Find the explanation section
+            if SECTION_EXPLANATION in response_text:
+                explanation_start = response_text.find(SECTION_EXPLANATION) + len(SECTION_EXPLANATION)
+                explanation = response_text[explanation_start:].strip()
+            
+            return {
+                "corrected": corrected,
+                "explanation": explanation
+            }
+            
+        except Exception as e:
+            logger.error(f"Error parsing response: {str(e)}")
+            return {
+                "corrected": response_text,
+                "explanation": ERROR_PARSING
+            }
 
+    def correct_text(self, text: str) -> dict:
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You correct grammar and explain mistakes."},
-                    {"role": "user", "content": prompt}
+                    {"role": "system", "content": TextCorrectionPrompts.get_system_prompt()},
+                    {"role": "user", "content": TextCorrectionPrompts.get_correction_prompt(text)}
                 ]
             )
-            return {"corrected": response.choices[0].message.content.strip()}
+            
+            response_text = response.choices[0].message.content.strip()
+            parsed_response = self._parse_response(response_text)
+            return ResponseWrapper.success(parsed_response)
+            
         except OpenAIError as e:
             error_message = str(e)
             logger.error(f"OpenAI API error: {error_message}")
             
-            if "insufficient_quota" in error_message:
-                return {
-                    "error": "API quota exceeded",
-                    "message": "The OpenAI API quota has been exceeded. Please check your billing details or try again later.",
-                    "details": "Visit https://platform.openai.com/account/billing to check your quota and billing status."
-                }
-            else:
-                return {
-                    "error": "OpenAI API error",
-                    "message": "An error occurred while processing your request.",
-                    "details": error_message
-                }
+            return ResponseWrapper.error(
+                error_type="OpenAI API error",
+                message=ERROR_OPENAI_API,
+                details=error_message
+            )
+            
         except Exception as e:
             logger.error(f"Unexpected error: {str(e)}")
-            return {
-                "error": "Server error",
-                "message": "An unexpected error occurred while processing your request.",
-                "details": str(e)
-            } 
+            return ResponseWrapper.error(
+                error_type="Server error",
+                message=ERROR_SERVER,
+                details=str(e)
+            ) 
