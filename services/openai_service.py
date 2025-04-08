@@ -1,5 +1,6 @@
 from openai import OpenAI, OpenAIError
 import logging
+import re
 from config.settings import OPENAI_API_KEY, OPENAI_MODEL
 from services.prompts import TextCorrectionPrompts
 from config.constants import (
@@ -43,6 +44,9 @@ class OpenAIService:
                 explanation_start = response_text.find(SECTION_EXPLANATION) + len(SECTION_EXPLANATION)
                 explanation = response_text[explanation_start:].strip()
             
+            # Clean up the corrected text - remove numbering and extra newlines
+            corrected = self._clean_corrected_text(corrected)
+            
             return {
                 "corrected": corrected,
                 "explanation": explanation
@@ -55,7 +59,19 @@ class OpenAIService:
                 "explanation": ERROR_PARSING
             }
 
+    def _clean_corrected_text(self, text: str) -> str:
+        """Clean up the corrected text by removing numbering and extra newlines."""
+        # Remove numbering patterns like "1.", "2.", etc.
+        text = re.sub(r'^\d+\.\s*', '', text, flags=re.MULTILINE)
+        
+        # Remove any remaining newlines and extra spaces
+        text = re.sub(r'\n+', ' ', text)
+        text = re.sub(r'\s+', ' ', text)
+        
+        return text.strip()
+
     def correct_text(self, text: str) -> dict:
+        logger.info(f"Correcting text: {text}")
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -66,6 +82,7 @@ class OpenAIService:
             )
             
             response_text = response.choices[0].message.content.strip()
+            logger.info(f"Response text: {response_text}")
             parsed_response = self._parse_response(response_text)
             return ResponseWrapper.success(parsed_response)
             

@@ -3,7 +3,7 @@ from models.input_model import TextInput
 from services.openai_service import OpenAIService
 from config.constants import RESPONSE_SUCCESS, RESPONSE_DATA
 
-router = APIRouter()
+router = APIRouter(prefix="/grammar")
 openai_service = OpenAIService()
 
 @router.post("/correct")
