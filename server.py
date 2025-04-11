@@ -15,10 +15,10 @@ app = FastAPI(title="MCP Server", description="Model Context Protocol Server")
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:4200"],  # Angular default port
+    allow_origins=["*"],  # Or ["https://your-ui.vercel.app"] for better security
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Include routers
