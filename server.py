@@ -4,6 +4,7 @@ import uvicorn
 import logging
 from config.settings import HOST, PORT, LOG_LEVEL
 from routes.text_routes import router as text_router
+from routes.roleplay_routes import router as roleplay_router
 
 # Configure logging
 logging.basicConfig(level=LOG_LEVEL)
@@ -22,6 +23,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(text_router, prefix="/api/v1", tags=["text"])
+app.include_router(roleplay_router, prefix="/api/v1/role-play", tags=["role-play"])
 
 if __name__ == "__main__":
     logger.info("Starting MCP Server...")

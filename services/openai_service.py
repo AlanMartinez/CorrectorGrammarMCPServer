@@ -1,4 +1,5 @@
-from openai import OpenAI, OpenAIError
+from openai import OpenAIError
+import openai
 import logging
 import re
 from config.settings import OPENAI_API_KEY, OPENAI_MODEL
@@ -20,7 +21,7 @@ class OpenAIService:
         if not OPENAI_API_KEY:
             raise ValueError(ERROR_API_KEY_MISSING)
             
-        self.client = OpenAI(api_key=OPENAI_API_KEY)
+        openai.api_key = OPENAI_API_KEY
         self.model = OPENAI_MODEL
 
     def _parse_response(self, response_text: str) -> dict:
@@ -73,7 +74,7 @@ class OpenAIService:
     def correct_text(self, text: str) -> dict:
         logger.info(f"Correcting text: {text}")
         try:
-            response = self.client.chat.completions.create(
+            response = openai.ChatCompletion.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": TextCorrectionPrompts.get_system_prompt()},
